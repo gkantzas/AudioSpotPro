@@ -1,3 +1,65 @@
+/**
+ * Broadcast SFX Engine (GitHub Pages & Vite Compatible)
+ * Maps studio SFX types to physical audio filenames in public/sfx with procedural fallback.
+ */
+
+export type SFXType =
+  // Retail & Sales
+  | 'cash_register'
+  | 'coins_shuffling'
+  | 'glass_toast'
+  | 'champagne_cork'
+  // Alerts & Bells
+  | 'doorbell'
+  | 'creaking_door'
+  | 'sliding_glass_door'
+  | 'wood_door'
+  | 'cell_phone_vibrate'
+  | 'phone_alerts'
+  | 'phone_ring'
+  | 'pop_notification'
+  | 'dinner_bell'
+  | 'digital_watch_alarm'
+  | 'alarm_clock'
+  | 'clock_ticking'
+  | 'bugle_tune'
+  | 'radio_beep'
+  | 'bell_chime'
+  // Cinematic & Impacts
+  | 'whoosh'
+  | 'cinematic_sweep'
+  | 'cinematic_suspense'
+  | 'sub_impact'
+  | 'glass_breaking'
+  | 'body_punch'
+  | 'wood_impact'
+  | 'impact_crash'
+  | 'magic_sparkle'
+  | 'wind_chimes'
+  // Vehicles & City
+  | 'car_screech'
+  | 'car_horn'
+  | 'air_horn'
+  | 'emergency_siren'
+  // Crowd & Events
+  | 'applause'
+  | 'crowd_cheer'
+  | 'coffee_shop'
+  // Office & Tech
+  | 'camera_click'
+  | 'typing_keyboard'
+  | 'button_push'
+  | 'record_scratch'
+  // Nature & Weather
+  | 'heavy_rain'
+  | 'distant_thunder'
+  | 'thunder_storm'
+  // Cartoon & Comedy
+  | 'cartoon_boing'
+  | 'slide_whistle'
+  | 'cartoon_cowbell'
+  | 'clown_horn';
+
 export interface SFXOption {
   id: SFXType;
   name: string;
@@ -71,3 +133,198 @@ export const AVAILABLE_SFX: SFXOption[] = [
   { id: 'cartoon_cowbell', name: 'Κωμικό Κουδούνι', category: 'Cartoon & Comedy', description: 'Κουδούνι slapstick', tags: ['cowbell', 'comedy', 'κουδούνι'], filename: 'cartoon_cowbell.ogg' },
   { id: 'clown_horn', name: 'Κόρνα Κλόουν', category: 'Cartoon & Comedy', description: 'Διπλό honk κλόουν', tags: ['horn', 'clown', 'κόρνα'], filename: 'clown_horn.ogg' },
 ];
+
+const SFX_FILE_MAPPING: Record<string, string[]> = {
+  bell_chime: ['medium_bell_ringing.ogg', 'bell_chime.ogg', 'bell_chime.mp3'],
+  whoosh: ['whoosh_swoosh.ogg', 'whoosh.ogg', 'whoosh.mp3'],
+  thunder_storm: ['thunder_crack.ogg', 'thunder_storm.ogg', 'thunder_storm.mp3'],
+  cash_register: ['cash_register.ogg', 'cash_register.mp3'],
+  champagne_cork: ['pop_bubble.ogg', 'champagne_cork.ogg', 'champagne_cork.mp3'],
+  pop_notification: ['pop_bubble.ogg', 'pop_notification.ogg', 'pop_notification.mp3'],
+  cell_phone_vibrate: ['cell_phone_vibrate.ogg', 'cell_phone_vibrate.mp3'],
+  clock_ticking: ['clock_ticking.ogg', 'clock_ticking.mp3'],
+  alarm_clock: ['alarm_clock.ogg', 'alarm_clock.mp3'],
+  car_screech: ['car_screech.ogg', 'car_screech.mp3'],
+  doorbell: ['doorbell.ogg', 'doorbell.mp3'],
+  sub_impact: ['sub_impact.ogg', 'sub_impact.mp3'],
+};
+
+const sfxBufferCache = new Map<string, AudioBuffer>();
+
+function getDynamicBasePath(): string {
+  if (typeof window === 'undefined') return './';
+  const path = window.location.pathname;
+  if (path.includes('/AudioSpotPro/')) {
+    return '/AudioSpotPro/';
+  }
+  return import.meta.env.BASE_URL || './';
+}
+
+function resolveSfxUrl(filename: string): string {
+  const base = getDynamicBasePath();
+  const cleanBase = base.endsWith('/') ? base : `${base}/`;
+  const cleanFile = filename.startsWith('/') ? filename.slice(1) : filename;
+  return `${cleanBase}sfx/${cleanFile}`;
+}
+
+async function loadAudioAsset(ctx: BaseAudioContext, sfxType: SFXType): Promise<AudioBuffer> {
+  const cached = sfxBufferCache.get(sfxType);
+  if (cached) return cached;
+
+  const candidateFiles = SFX_FILE_MAPPING[sfxType] || [
+    `${sfxType}.ogg`,
+    `${sfxType}.mp3`,
+    `${sfxType}.wav`
+  ];
+
+  let lastError: any = null;
+
+  for (const filename of candidateFiles) {
+    const url = resolveSfxUrl(filename);
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`SFX HTTP ${response.status} for ${url}`);
+      }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const decodedBuffer = await (ctx as AudioContext).decodeAudioData(arrayBuffer);
+      sfxBufferCache.set(sfxType, decodedBuffer);
+      return decodedBuffer;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  throw lastError || new Error(`No audio file found for SFX type: ${sfxType}`);
+}
+
+export async function renderSFXBuffer(
+  ctx: BaseAudioContext,
+  sfxType: SFXType,
+  volume = 1.0
+): Promise<AudioBuffer> {
+  try {
+    const assetBuffer = await loadAudioAsset(ctx, sfxType);
+    if (Math.abs(volume - 1.0) < 0.02) {
+      return assetBuffer;
+    }
+
+    const scaled = ctx.createBuffer(
+      assetBuffer.numberOfChannels,
+      assetBuffer.length,
+      assetBuffer.sampleRate
+    );
+    for (let ch = 0; ch < assetBuffer.numberOfChannels; ch++) {
+      const src = assetBuffer.getChannelData(ch);
+      const dest = scaled.getChannelData(ch);
+      for (let i = 0; i < src.length; i++) {
+        dest[i] = src[i] * volume;
+      }
+    }
+    return scaled;
+  } catch (err) {
+    console.warn(`[SFX Engine] Fallback procedural synthesis for "${sfxType}":`, err);
+    return renderProceduralSFX(ctx, sfxType, volume);
+  }
+}
+
+export async function auditionSFX(sfxType: SFXType, volume = 1.0): Promise<void> {
+  try {
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const buffer = await renderSFXBuffer(audioCtx, sfxType, volume);
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+
+    const gain = audioCtx.createGain();
+    gain.gain.value = volume;
+
+    source.connect(gain);
+    gain.connect(audioCtx.destination);
+    source.start(0);
+  } catch (err) {
+    console.warn(`Failed to audition SFX "${sfxType}":`, err);
+  }
+}
+
+function renderProceduralSFX(ctx: BaseAudioContext, sfxType: SFXType, volume = 1.0): AudioBuffer {
+  const sampleRate = ctx.sampleRate;
+
+  switch (sfxType) {
+    case 'cash_register': {
+      const dur = 0.55;
+      const buf = ctx.createBuffer(2, Math.floor(sampleRate * dur), sampleRate);
+      const left = buf.getChannelData(0);
+      const right = buf.getChannelData(1);
+
+      for (let i = 0; i < buf.length; i++) {
+        const t = i / sampleRate;
+        const env1 = Math.exp(-t * 12);
+        const env2 = Math.exp(-Math.max(0, t - 0.08) * 8);
+
+        const bell1 = Math.sin(2 * Math.PI * 1860 * t) * env1;
+        const bell2 = Math.sin(2 * Math.PI * 3720 * t) * 0.4 * env1;
+        const bell3 = Math.sin(2 * Math.PI * 2480 * t) * 0.5 * env2;
+
+        const noise = (Math.random() * 2 - 1) * Math.exp(-t * 40) * 0.25;
+        const sample = (bell1 + bell2 + bell3 + noise) * 0.6 * volume;
+
+        left[i] = sample;
+        right[i] = sample;
+      }
+      return buf;
+    }
+
+    case 'whoosh': {
+      const dur = 0.6;
+      const buf = ctx.createBuffer(2, Math.floor(sampleRate * dur), sampleRate);
+      const left = buf.getChannelData(0);
+      const right = buf.getChannelData(1);
+
+      for (let i = 0; i < buf.length; i++) {
+        const t = i / dur;
+        const env = Math.sin(Math.PI * t);
+        const noise = (Math.random() * 2 - 1) * env * 0.5 * volume;
+
+        left[i] = noise * (1 - t);
+        right[i] = noise * t;
+      }
+      return buf;
+    }
+
+    case 'sub_impact': {
+      const dur = 0.8;
+      const buf = ctx.createBuffer(2, Math.floor(sampleRate * dur), sampleRate);
+      const left = buf.getChannelData(0);
+      const right = buf.getChannelData(1);
+
+      for (let i = 0; i < buf.length; i++) {
+        const t = i / sampleRate;
+        const freq = 120 * Math.exp(-t * 6) + 38;
+        const env = Math.exp(-t * 3.5);
+        const sample = Math.sin(2 * Math.PI * freq * t) * env * 0.7 * volume;
+
+        left[i] = sample;
+        right[i] = sample;
+      }
+      return buf;
+    }
+
+    default: {
+      const dur = 0.45;
+      const buf = ctx.createBuffer(2, Math.floor(sampleRate * dur), sampleRate);
+      const left = buf.getChannelData(0);
+      const right = buf.getChannelData(1);
+
+      for (let i = 0; i < buf.length; i++) {
+        const t = i / sampleRate;
+        const env = Math.exp(-t * 7);
+        const sample = (Math.sin(2 * Math.PI * 880 * t) + Math.sin(2 * Math.PI * 1760 * t) * 0.3) * env * 0.5 * volume;
+
+        left[i] = sample;
+        right[i] = sample;
+      }
+      return buf;
+    }
+  }
+}
