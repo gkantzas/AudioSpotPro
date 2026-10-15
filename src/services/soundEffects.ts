@@ -60,68 +60,136 @@ export type SFXType =
   | 'cartoon_cowbell'
   | 'clown_horn';
 
-// Αντιστοίχιση των SFXType με τα πραγματικά ονόματα αρχείων στο public/sfx
-const SFX_FILE_ALIASES: Partial<Record<SFXType, string[]>> = {
-  bell_chime: ['medium_bell_ringing', 'bell_chime'],
-  whoosh: ['whoosh_swoosh', 'whoosh'],
-  thunder_storm: ['thunder_crack', 'thunder_storm'],
-  car_screech: ['car_screech', 'tires_screech'],
-  sub_impact: ['sub_impact', 'bass_drop'],
-  doorbell: ['doorbell', 'ding_dong'],
+export interface SFXOption {
+  id: SFXType;
+  name: string;
+  category: string;
+  filename: string;
+}
+
+export const AVAILABLE_SFX: SFXOption[] = [
+  // Retail & Sales
+  { id: 'cash_register', name: 'Ταμειακή Μηχανή', category: 'Retail & Sales', filename: 'cash_register.ogg' },
+  { id: 'coins_shuffling', name: 'Κέρματα & Χαρτονομίσματα', category: 'Retail & Sales', filename: 'coins_shuffling.ogg' },
+  { id: 'glass_toast', name: 'Τσούγκρισμα Ποτηριών', category: 'Retail & Sales', filename: 'glass_toast.ogg' },
+  { id: 'champagne_cork', name: 'Φελλός Σαμπάνιας', category: 'Retail & Sales', filename: 'pop_bubble.ogg' },
+  // Alerts & Bells
+  { id: 'bell_chime', name: 'Καμπανάκι / Chime', category: 'Alerts & Bells', filename: 'medium_bell_ringing.ogg' },
+  { id: 'doorbell', name: 'Κουδούνι Εξώπορτας', category: 'Alerts & Bells', filename: 'doorbell.ogg' },
+  { id: 'creaking_door', name: 'Παλιά Πόρτα (Τρίξιμο)', category: 'Alerts & Bells', filename: 'creaking_door.ogg' },
+  { id: 'sliding_glass_door', name: 'Συρόμενη Τζαμαρία', category: 'Alerts & Bells', filename: 'sliding_glass_door.ogg' },
+  { id: 'wood_door', name: 'Ξύλινη Πόρτα', category: 'Alerts & Bells', filename: 'wood_door.ogg' },
+  { id: 'cell_phone_vibrate', name: 'Δόνηση Κινητού', category: 'Alerts & Bells', filename: 'cell_phone_vibrate.ogg' },
+  { id: 'phone_alerts', name: 'Ήχος Κλήσης', category: 'Alerts & Bells', filename: 'phone_alerts.ogg' },
+  { id: 'phone_ring', name: 'Τηλεφωνικός Ήχος', category: 'Alerts & Bells', filename: 'phone_ring.ogg' },
+  { id: 'pop_notification', name: 'Ειδοποίηση Pop', category: 'Alerts & Bells', filename: 'pop_bubble.ogg' },
+  { id: 'dinner_bell', name: 'Τρίγωνο / Reception', category: 'Alerts & Bells', filename: 'dinner_bell.ogg' },
+  { id: 'digital_watch_alarm', name: 'Ψηφιακό Χρονόμετρο', category: 'Alerts & Bells', filename: 'digital_watch_alarm.ogg' },
+  { id: 'alarm_clock', name: 'Ξυπνητήρι', category: 'Alerts & Bells', filename: 'alarm_clock.ogg' },
+  { id: 'clock_ticking', name: 'Τικ-Τακ Ρολογιού', category: 'Alerts & Bells', filename: 'clock_ticking.ogg' },
+  { id: 'bugle_tune', name: 'Σάλπισμα / Fanfare', category: 'Alerts & Bells', filename: 'bugle_tune.ogg' },
+  { id: 'radio_beep', name: 'Σήμα Ώρας / Beep', category: 'Alerts & Bells', filename: 'radio_beep.ogg' },
+  // Cinematic & Impacts
+  { id: 'whoosh', name: 'Whoosh Μετάβασης', category: 'Cinematic & Impacts', filename: 'whoosh_swoosh.ogg' },
+  { id: 'cinematic_sweep', name: 'Κλιμάκωση / Riser', category: 'Cinematic & Impacts', filename: 'cinematic_sweep.ogg' },
+  { id: 'cinematic_suspense', name: 'Αγωνία / Drone', category: 'Cinematic & Impacts', filename: 'cinematic_suspense.ogg' },
+  { id: 'sub_impact', name: 'Sub Boom / 808', category: 'Cinematic & Impacts', filename: 'sub_impact.ogg' },
+  { id: 'glass_breaking', name: 'Σπάσιμο Τζαμιού', category: 'Cinematic & Impacts', filename: 'glass_breaking.ogg' },
+  { id: 'body_punch', name: 'Χτύπημα / Punch', category: 'Cinematic & Impacts', filename: 'body_punch.ogg' },
+  { id: 'wood_impact', name: 'Χτύπημα σε Ξύλο', category: 'Cinematic & Impacts', filename: 'wood_impact.ogg' },
+  { id: 'impact_crash', name: 'Σύγκρουση / Crash', category: 'Cinematic & Impacts', filename: 'impact_crash.ogg' },
+  { id: 'magic_sparkle', name: 'Μαγική Αστερόσκονη', category: 'Cinematic & Impacts', filename: 'magic_sparkle.ogg' },
+  { id: 'wind_chimes', name: 'Ανεμοκουδούνια', category: 'Cinematic & Impacts', filename: 'wind_chimes.ogg' },
+  // Vehicles & City
+  { id: 'car_screech', name: 'Φρενάρισμα Αυτοκινήτου', category: 'Vehicles & City', filename: 'car_screech.ogg' },
+  { id: 'car_horn', name: 'Κόρνα Αυτοκινήτου', category: 'Vehicles & City', filename: 'car_horn.ogg' },
+  { id: 'air_horn', name: 'Κόρνα DJ / Stadium', category: 'Vehicles & City', filename: 'air_horn.ogg' },
+  { id: 'emergency_siren', name: 'Σειρήνα', category: 'Vehicles & City', filename: 'emergency_siren.ogg' },
+  // Crowd & Events
+  { id: 'applause', name: 'Χειροκρότημα', category: 'Crowd & Events', filename: 'applause.ogg' },
+  { id: 'crowd_cheer', name: 'Επευφημίες Κοινού', category: 'Crowd & Events', filename: 'crowd_cheer.ogg' },
+  { id: 'coffee_shop', name: 'Ατμόσφαιρα Καφέ', category: 'Crowd & Events', filename: 'coffee_shop.ogg' },
+  // Office & Tech
+  { id: 'camera_click', name: 'Κλικ Φωτογραφικής', category: 'Office & Tech', filename: 'camera_click.ogg' },
+  { id: 'typing_keyboard', name: 'Πληκτρολόγιο', category: 'Office & Tech', filename: 'typing_keyboard.ogg' },
+  { id: 'button_push', name: 'Πάτημα Διακόπτη', category: 'Office & Tech', filename: 'button_push.ogg' },
+  { id: 'record_scratch', name: 'Σκρατς Βινυλίου', category: 'Office & Tech', filename: 'record_scratch.ogg' },
+  // Nature & Weather
+  { id: 'heavy_rain', name: 'Δυνατή Βροχή', category: 'Nature & Weather', filename: 'heavy_rain.ogg' },
+  { id: 'distant_thunder', name: 'Μακρινή Βροντή', category: 'Nature & Weather', filename: 'distant_thunder.ogg' },
+  { id: 'thunder_storm', name: 'Κεραυνός & Καταιγίδα', category: 'Nature & Weather', filename: 'thunder_crack.ogg' },
+  // Cartoon & Comedy
+  { id: 'cartoon_boing', name: 'Ελατήριο Boing', category: 'Cartoon & Comedy', filename: 'cartoon_boing.ogg' },
+  { id: 'slide_whistle', name: 'Σφυρίχτρα Slide', category: 'Cartoon & Comedy', filename: 'slide_whistle.ogg' },
+  { id: 'cartoon_cowbell', name: 'Κωμικό Κουδούνι', category: 'Cartoon & Comedy', filename: 'cartoon_cowbell.ogg' },
+  { id: 'clown_horn', name: 'Κόρνα Κλόουν', category: 'Cartoon & Comedy', filename: 'clown_horn.ogg' },
+];
+
+const SFX_FILE_MAPPING: Record<string, string[]> = {
+  bell_chime: ['medium_bell_ringing.ogg', 'bell_chime.ogg', 'bell_chime.mp3'],
+  whoosh: ['whoosh_swoosh.ogg', 'whoosh.ogg', 'whoosh.mp3'],
+  thunder_storm: ['thunder_crack.ogg', 'thunder_storm.ogg', 'thunder_storm.mp3'],
+  cash_register: ['cash_register.ogg', 'cash_register.mp3'],
+  champagne_cork: ['pop_bubble.ogg', 'champagne_cork.ogg', 'champagne_cork.mp3'],
+  pop_notification: ['pop_bubble.ogg', 'pop_notification.ogg', 'pop_notification.mp3'],
+  cell_phone_vibrate: ['cell_phone_vibrate.ogg', 'cell_phone_vibrate.mp3'],
+  clock_ticking: ['clock_ticking.ogg', 'clock_ticking.mp3'],
+  alarm_clock: ['alarm_clock.ogg', 'alarm_clock.mp3'],
+  car_screech: ['car_screech.ogg', 'car_screech.mp3'],
+  doorbell: ['doorbell.ogg', 'doorbell.mp3'],
+  sub_impact: ['sub_impact.ogg', 'sub_impact.mp3'],
 };
 
-// Cache αποκωδικοποιημένων AudioBuffer
 const sfxBufferCache = new Map<string, AudioBuffer>();
 
-/**
- * Υπολογίζει σωστά το URL του asset είτε τρέχει σε localhost είτε στο GitHub Pages
- */
+function getDynamicBasePath(): string {
+  if (typeof window === 'undefined') return './';
+  const path = window.location.pathname;
+  if (path.includes('/AudioSpotPro/')) {
+    return '/AudioSpotPro/';
+  }
+  return import.meta.env.BASE_URL || './';
+}
+
 function resolveSfxUrl(filename: string): string {
-  const base = import.meta.env.BASE_URL || './';
+  const base = getDynamicBasePath();
   const cleanBase = base.endsWith('/') ? base : `${base}/`;
   const cleanFile = filename.startsWith('/') ? filename.slice(1) : filename;
   return `${cleanBase}sfx/${cleanFile}`;
 }
 
-/**
- * Φορτώνει το πραγματικό audio asset από το public/sfx δοκιμάζοντας aliases και επεκτάσεις (.ogg, .mp3, .wav)
- */
 async function loadAudioAsset(ctx: BaseAudioContext, sfxType: SFXType): Promise<AudioBuffer> {
   const cached = sfxBufferCache.get(sfxType);
   if (cached) return cached;
 
-  const candidateNames = SFX_FILE_ALIASES[sfxType]
-    ? [...SFX_FILE_ALIASES[sfxType]!, sfxType]
-    : [sfxType];
+  const candidateFiles = SFX_FILE_MAPPING[sfxType] || [
+    `${sfxType}.ogg`,
+    `${sfxType}.mp3`,
+    `${sfxType}.wav`
+  ];
 
-  const extensions = ['ogg', 'mp3', 'wav'];
   let lastError: any = null;
 
-  for (const name of candidateNames) {
-    for (const ext of extensions) {
-      const url = resolveSfxUrl(`${name}.${ext}`);
-      try {
-        const response = await fetch(url);
-        if (!response.ok) {
-          throw new Error(`SFX HTTP ${response.status} for ${url}`);
-        }
-
-        const arrayBuffer = await response.arrayBuffer();
-        const decodedBuffer = await (ctx as AudioContext).decodeAudioData(arrayBuffer);
-        sfxBufferCache.set(sfxType, decodedBuffer);
-        return decodedBuffer;
-      } catch (err) {
-        lastError = err;
+  for (const filename of candidateFiles) {
+    const url = resolveSfxUrl(filename);
+    try {
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`SFX HTTP ${response.status} for ${url}`);
       }
+
+      const arrayBuffer = await response.arrayBuffer();
+      const decodedBuffer = await (ctx as AudioContext).decodeAudioData(arrayBuffer);
+      sfxBufferCache.set(sfxType, decodedBuffer);
+      return decodedBuffer;
+    } catch (err) {
+      lastError = err;
     }
   }
 
   throw lastError || new Error(`No audio file found for SFX type: ${sfxType}`);
 }
 
-/**
- * Παράγει το AudioBuffer: δοκιμάζει το φυσικό αρχείο και, αν αποτύχει, ενεργοποιεί το procedural synth
- */
 export async function renderSFXBuffer(
   ctx: BaseAudioContext,
   sfxType: SFXType,
@@ -147,14 +215,32 @@ export async function renderSFXBuffer(
     }
     return scaled;
   } catch (err) {
-    console.warn(`[SFX Engine] Could not load audio asset for "${sfxType}", using procedural synthesis fallback:`, err);
+    console.warn(`[SFX Engine] Fallback procedural synthesis for "${sfxType}":`, err);
     return renderProceduralSFX(ctx, sfxType, volume);
   }
 }
 
 /**
- * Procedural Audio Synthesis Fallback (Web Audio API)
+ * Παίζει ένα σύντομο preview του SFX όταν ο χρήστης κάνει κλικ στο UI (ScriptWorkspace)
  */
+export async function auditionSFX(sfxType: SFXType, volume = 1.0): Promise<void> {
+  try {
+    const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+    const buffer = await renderSFXBuffer(audioCtx, sfxType, volume);
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+
+    const gain = audioCtx.createGain();
+    gain.gain.value = volume;
+
+    source.connect(gain);
+    gain.connect(audioCtx.destination);
+    source.start(0);
+  } catch (err) {
+    console.warn(`Failed to audition SFX "${sfxType}":`, err);
+  }
+}
+
 function renderProceduralSFX(ctx: BaseAudioContext, sfxType: SFXType, volume = 1.0): AudioBuffer {
   const sampleRate = ctx.sampleRate;
 
@@ -218,8 +304,6 @@ function renderProceduralSFX(ctx: BaseAudioContext, sfxType: SFXType, volume = 1
       return buf;
     }
 
-    case 'radio_beep':
-    case 'bell_chime':
     default: {
       const dur = 0.45;
       const buf = ctx.createBuffer(2, Math.floor(sampleRate * dur), sampleRate);
