@@ -1,0 +1,6 @@
+{
+  "name": "AudioSpot Pro - AI Radio Ad Studio",
+  "description": "Επαγγελματικό στούντιο παραγωγής ηχητικών σποτ & ραδιοφωνικών διαφημίσεων με AI copywriter, σκηνοθεσία φωνών και μίξη ήχου.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

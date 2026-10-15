@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AudioSpot Pro - AI Radio Ad Studio</title>
+    <meta name="description" content="Επαγγελματικό στούντιο παραγωγής ηχητικών σποτ & ραδιοφωνικών διαφημίσεων με AI copywriter, σκηνοθεσία φωνών και μίξη ήχου." />
+    <meta property="og:title" content="AudioSpot Pro - AI Radio Ad Studio" />
+    <meta property="og:description" content="Επαγγελματικό στούντιο παραγωγής ηχητικών σποτ & ραδιοφωνικών διαφημίσεων με AI copywriter, σκηνοθεσία φωνών και μίξη ήχου." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <script>
+      // Ignore harmless Vite HMR WebSocket errors in AI Studio iframe environment
+      window.addEventListener('unhandledrejection', function(event) {
+        if (
+          event.reason &&
+          (String(event.reason).includes('WebSocket') ||
+            String(event.reason?.stack).includes('@vite/client') ||
+            String(event.reason?.message).includes('@vite/client'))
+        ) {
+          event.preventDefault();
+        }
+      });
+      window.addEventListener('error', function(event) {
+        if (
+          (event.filename && event.filename.includes('@vite/client')) ||
+          (event.message &&
+            (event.message.includes('WebSocket') ||
+              event.message.includes('@vite/client') ||
+              event.message.includes('createWebSocketModuleRunnerTransport')))
+        ) {
+          event.preventDefault();
+        }
+      });
+    </script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
