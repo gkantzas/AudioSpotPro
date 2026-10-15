@@ -1,8 +1,7 @@
 import { GoogleGenAI, Type } from '@google/genai';
 
-// 1. Browser-safe WAV Header Generator (Αντικαθιστά το ensureWavHeader του Node Buffer)
+// 1. Browser-safe WAV Header Generator (24kHz, 16-bit, mono)
 export function ensureWavHeader(rawBytes: Uint8Array, sampleRate = 24000): Uint8Array {
-  // Αν έχει ήδη RIFF header
   if (
     rawBytes.length >= 44 &&
     rawBytes[0] === 0x52 && rawBytes[1] === 0x49 && rawBytes[2] === 0x46 && rawBytes[3] === 0x46
@@ -27,7 +26,7 @@ export function ensureWavHeader(rawBytes: Uint8Array, sampleRate = 24000): Uint8
   // fmt subchunk
   view.setUint32(12, 0x666d7420, false); // "fmt "
   view.setUint32(16, 16, true);          // Subchunk1Size
-  view.setUint16(20, 1, true);           // PCM format
+  view.setUint16(20, 1, true);           // PCM
   view.setUint16(22, numChannels, true);
   view.setUint32(24, sampleRate, true);
   view.setUint32(28, byteRate, true);
@@ -43,7 +42,6 @@ export function ensureWavHeader(rawBytes: Uint8Array, sampleRate = 24000): Uint8
   return result;
 }
 
-// 2. Base64 to Uint8Array helper
 export function base64ToUint8Array(base64: string): Uint8Array {
   const binaryString = atob(base64);
   const len = binaryString.length;
@@ -63,16 +61,18 @@ export function uint8ArrayToBase64(bytes: Uint8Array): string {
   return btoa(binary);
 }
 
-// 3. Audio Director Prompts & Logic
+// 2. Production Director System Prompt
 const AUDIO_DIRECTOR_SYSTEM_PROMPT = `
-Είσαι ένας κορυφαίος, πολυβραβευμένος κειμενογράφος και σκηνοθέτης ηχητικών & ραδιοφωνικών διαφημίσεων.
+Είσαι ένας κορυφαίος κειμενογράφος και σκηνοθέτης ηχητικών & ραδιοφωνικών διαφημίσεων.
 Η αποστολή σου είναι να δημιουργείς έτοιμα προς εκφώνηση διαφημιστικά σποτ.
 ΑΥΣΤΗΡΟΙ ΚΑΝΟΝΕΣ:
-1. Το spokenText περιέχει ΑΠΟΚΛΕΙΣΤΙΚΑ τα λόγια του εκφωνητή. ΟΧΙ τίτλους, χρόνους ή ρόλους.
-2. Αν υπάρχουν 2+ φωνές, να υπάρχει ζωντανός διάλογος χωρίς επαναλήψεις.
-3. Σωστή επιλογή φύλου και φωνών.
+1. Το "spokenText" περιέχει ΑΠΟΚΛΕΙΣΤΙΚΑ ΚΑΙ ΜΟΝΟ τα λόγια που εκφωνούνται. ΟΧΙ τίτλους, χρόνους ή ονόματα ρόλων.
+2. Αν υπάρχουν 2 ή περισσότερες φωνές, να υπάρχει ζωντανός διάλογος χωρίς επαναλήψεις.
+3. Στο speakerId χρησιμοποίησε ακριβώς "Φωνή 1", "Φωνή 2" κ.ο.κ.
+4. Στο gender δήλωσε αυστηρά "male" ή "female".
 `;
 
+// 3. Client-side Script Generation (gemini-3.8-flash)
 export async function clientGenerateScript(params: {
   apiKey: string;
   topic: string;
@@ -91,7 +91,7 @@ export async function clientGenerateScript(params: {
     style = 'Ενθουσιώδες / Προσφορά',
     tone = 'Φιλικός & Πειστικός',
     callToAction = '',
-    productionLanguage = 'el'
+    productionLanguage = 'el',
   } = params;
 
   const ai = new GoogleGenAI({ apiKey });
@@ -110,61 +110,80 @@ export async function clientGenerateScript(params: {
 ${callToAction ? `- Call-To-Action: ${callToAction}` : ''}
 `;
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
-    contents: userPrompt,
-    config: {
-      systemInstruction: AUDIO_DIRECTOR_SYSTEM_PROMPT,
-      temperature: 0.7,
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          title: { type: Type.STRING },
-          conceptSummary: { type: Type.STRING },
-          recommendedMusicStyle: { type: Type.STRING },
-          speakers: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                speakerId: { type: Type.STRING },
-                roleName: { type: Type.STRING },
-                gender: { type: Type.STRING },
-                voicePersona: { type: Type.STRING },
-                actingStyle: { type: Type.STRING }
-              },
-              required: ['speakerId', 'roleName', 'gender', 'voicePersona', 'actingStyle']
-            }
-          },
-          timeline: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                type: { type: Type.STRING },
-                speakerId: { type: Type.STRING },
-                actingCue: { type: Type.STRING },
-                spokenText: { type: Type.STRING },
-                sfxType: { type: Type.STRING },
-                sfxDescription: { type: Type.STRING }
-              },
-              required: ['type']
-            }
-          }
-        },
-        required: ['title', 'conceptSummary', 'recommendedMusicStyle', 'speakers', 'timeline']
-      }
-    }
-  });
+  // Χρήση του σύγχρονου gemini-3.8-flash με fallback σε gemini-3.5-flash-lite
+  const candidateModels = ['gemini-3.8-flash', 'gemini-3.5-flash-lite'];
+  let rawJson = '';
+  let lastError: any = null;
 
-  const parsed = JSON.parse(response.text || '{}');
-  
-  // Format timeline text
+  for (const modelCandidate of candidateModels) {
+    try {
+      const response = await ai.models.generateContent({
+        model: modelCandidate,
+        contents: userPrompt,
+        config: {
+          systemInstruction: AUDIO_DIRECTOR_SYSTEM_PROMPT,
+          temperature: 0.7,
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              title: { type: Type.STRING },
+              conceptSummary: { type: Type.STRING },
+              recommendedMusicStyle: { type: Type.STRING },
+              speakers: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    speakerId: { type: Type.STRING },
+                    roleName: { type: Type.STRING },
+                    gender: { type: Type.STRING },
+                    voicePersona: { type: Type.STRING },
+                    actingStyle: { type: Type.STRING },
+                  },
+                  required: ['speakerId', 'roleName', 'gender', 'voicePersona', 'actingStyle'],
+                },
+              },
+              timeline: {
+                type: Type.ARRAY,
+                items: {
+                  type: Type.OBJECT,
+                  properties: {
+                    type: { type: Type.STRING },
+                    speakerId: { type: Type.STRING },
+                    actingCue: { type: Type.STRING },
+                    spokenText: { type: Type.STRING },
+                    sfxType: { type: Type.STRING },
+                    sfxDescription: { type: Type.STRING },
+                  },
+                  required: ['type'],
+                },
+              },
+            },
+            required: ['title', 'conceptSummary', 'recommendedMusicStyle', 'speakers', 'timeline'],
+          },
+        },
+      });
+
+      if (response.text) {
+        rawJson = response.text.trim();
+        break;
+      }
+    } catch (err: any) {
+      lastError = err;
+      console.warn(`Model ${modelCandidate} failed, trying fallback:`, err?.message || err);
+    }
+  }
+
+  if (!rawJson) {
+    throw lastError || new Error('Αποτυχία παραγωγής σεναρίου από το Gemini API.');
+  }
+
+  const parsed = JSON.parse(rawJson);
   const scriptLinesText: string[] = [];
   let totalSpokenWords = 0;
 
-  for (const item of (parsed.timeline || [])) {
+  for (const item of parsed.timeline || []) {
     if (item.type === 'sfx' && item.sfxDescription) {
       scriptLinesText.push(`[SFX: ${item.sfxDescription}]`);
     } else if (item.type === 'dialogue' && item.spokenText) {
@@ -184,52 +203,67 @@ ${callToAction ? `- Call-To-Action: ${callToAction}` : ''}
     estimatedDurationSec: Math.round(totalSpokenWords / 2.3),
     targetDurationSec: Number(targetDuration),
     structuredSpeakers: parsed.speakers || [],
-    timeline: parsed.timeline || []
+    timeline: parsed.timeline || [],
   };
 }
 
-// 4. Client-side Speech Synthesis via Gemini TTS
+// 4. Client-side Speech Synthesis (Gemini 3.8 Flash TTS)
 export async function clientSynthesizeSpeech(params: {
   apiKey: string;
   text: string;
   voiceName?: string;
   actingStyle?: string;
 }) {
-  const { apiKey, text, voiceName = 'Fenrir', actingStyle = 'Natural commercial voice' } = params;
+  const { apiKey, text, voiceName = 'Fenrir', actingStyle = 'Natural commercial voice in Greek' } = params;
   const ai = new GoogleGenAI({ apiKey });
 
-  // Clean text from bracketed stage directions
   const cleaned = text.replace(/\[[^\]]*\]/g, '').replace(/<[^>]+>/g, '').trim();
   if (!cleaned) throw new Error('Δεν υπάρχει κείμενο προς εκφώνηση.');
 
-  const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
-    contents: [
-      {
-        role: 'user',
-        parts: [
-          {
-            text: cleaned,
-            // @ts-ignore
-            speechMetadata: { style: actingStyle }
-          }
-        ]
-      }
-    ],
-    config: {
-      // @ts-ignore
-      responseModalities: ['AUDIO'],
-      speechConfig: {
-        voiceConfig: {
-          prebuiltVoiceConfig: { voiceName }
-        }
-      }
-    }
-  });
+  // Δοκιμή στα εξειδικευμένα μοντέλα TTS: gemini-3.8-flash-tts και fallback σε gemini-3.8-flash-lite-tts
+  const ttsModels = ['gemini-3.8-flash-tts', 'gemini-3.8-flash-lite-tts'];
+  let base64Audio = '';
+  let lastTtsError: any = null;
 
-  const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+  for (const modelCandidate of ttsModels) {
+    try {
+      const response = await ai.models.generateContent({
+        model: modelCandidate,
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                text: cleaned,
+                // @ts-ignore
+                speechMetadata: {
+                  style: actingStyle,
+                },
+              },
+            ],
+          },
+        ],
+        config: {
+          // @ts-ignore
+          responseModalities: ['AUDIO'],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName },
+            },
+          },
+        },
+      });
+
+      base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data || '';
+      if (base64Audio) break;
+    } catch (err: any) {
+      lastTtsError = err;
+      console.warn(`TTS Model ${modelCandidate} failed:`, err?.message || err);
+    }
+  }
+
   if (!base64Audio) {
-    throw new Error('Δεν επιστράφηκαν ηχητικά δεδομένα.');
+    throw lastTtsError || new Error('Δεν επιστράφηκαν ηχητικά δεδομένα από το Gemini TTS.');
   }
 
   const rawBytes = base64ToUint8Array(base64Audio);
@@ -239,6 +273,6 @@ export async function clientSynthesizeSpeech(params: {
     success: true,
     audioBase64: uint8ArrayToBase64(wavBytes),
     mimeType: 'audio/wav',
-    spokenText: cleaned
+    spokenText: cleaned,
   };
 }
