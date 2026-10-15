@@ -9,7 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export default defineConfig(() => {
   return {
     // Ορισμός σχετικής διαδρομής για να φορτώνουν σωστά τα assets στο GitHub Pages
-    base: './',
+    base: '/AudioSpotPro/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
