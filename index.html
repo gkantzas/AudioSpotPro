@@ -1,80 +1,41 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gemini AI App</title>
-  <style>
-    body { font-family: system-ui, -apple-system, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; color: #222; }
-    h2 { margin-bottom: 8px; }
-    .card { background: #f8f9fa; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; margin-bottom: 20px; }
-    label { font-weight: 600; display: block; margin-bottom: 6px; }
-    input, textarea { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 6px; box-sizing: border-box; font-family: inherit; }
-    textarea { height: 120px; resize: vertical; margin-top: 6px; }
-    button { background: #2563eb; color: #fff; border: none; padding: 10px 20px; border-radius: 6px; font-weight: 600; cursor: pointer; margin-top: 10px; }
-    button:disabled { background: #94a3b8; cursor: not-allowed; }
-    #output { white-space: pre-wrap; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 16px; min-height: 80px; margin-top: 16px; }
-  </style>
-</head>
-<body>
-
-  <h2>Gemini Assistant</h2>
-  <p>Bring Your Own Key (BYOK) Runner</p>
-
-  <div class="card">
-    <label for="apiKey">Google AI Studio API Key:</label>
-    <input type="password" id="apiKey" placeholder="AIzaSy..." />
-    <small style="color: #64748b;">Saved only in your local browser storage.</small>
-  </div>
-
-  <div class="card">
-    <label for="prompt">Prompt:</label>
-    <textarea id="prompt" placeholder="Type your prompt here..."></textarea>
-    <button id="submitBtn">Generate Response</button>
-    
-    <label style="margin-top: 20px;">Output:</label>
-    <div id="output">Your response will display here...</div>
-  </div>
-
-  <script type="module">
-    import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
-
-    const keyField = document.getElementById("apiKey");
-    const promptField = document.getElementById("prompt");
-    const submitBtn = document.getElementById("submitBtn");
-    const outputDiv = document.getElementById("output");
-
-    // Load existing key
-    keyField.value = localStorage.getItem("byok_gemini_key") || "";
-
-    keyField.addEventListener("input", () => {
-      localStorage.setItem("byok_gemini_key", keyField.value.trim());
-    });
-
-    submitBtn.addEventListener("click", async () => {
-      const apiKey = keyField.value.trim();
-      const userPrompt = promptField.value.trim();
-
-      if (!apiKey) {
-        alert("Please provide a Gemini API key.");
-        return;
-      }
-      if (!userPrompt) return;
-
-      submitBtn.disabled = true;
-      outputDiv.innerText = "Generating response...";
-
-      try {
-        const ai = new GoogleGenerativeAI(apiKey);
-        const model = ai.getGenerativeModel({ model: "gemini-2.5-flash" });
-        const result = await model.generateContent(userPrompt);
-        outputDiv.innerText = result.response.text();
-      } catch (err) {
-        outputDiv.innerText = "Error: " + err.message;
-      } finally {
-        submitBtn.disabled = false;
-      }
-    });
-  </script>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AudioSpot Pro - AI Radio Ad Studio</title>
+    <meta name="description" content="Επαγγελματικό στούντιο παραγωγής ηχητικών σποτ & ραδιοφωνικών διαφημίσεων με AI copywriter, σκηνοθεσία φωνών και μίξη ήχου." />
+    <meta property="og:title" content="AudioSpot Pro - AI Radio Ad Studio" />
+    <meta property="og:description" content="Επαγγελματικό στούντιο παραγωγής ηχητικών σποτ & ραδιοφωνικών διαφημίσεων με AI copywriter, σκηνοθεσία φωνών και μίξη ήχου." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+  </head>
+  <body>
+    <script>
+      // Ignore harmless Vite HMR WebSocket errors in AI Studio iframe environment
+      window.addEventListener('unhandledrejection', function(event) {
+        if (
+          event.reason &&
+          (String(event.reason).includes('WebSocket') ||
+            String(event.reason?.stack).includes('@vite/client') ||
+            String(event.reason?.message).includes('@vite/client'))
+        ) {
+          event.preventDefault();
+        }
+      });
+      window.addEventListener('error', function(event) {
+        if (
+          (event.filename && event.filename.includes('@vite/client')) ||
+          (event.message &&
+            (event.message.includes('WebSocket') ||
+              event.message.includes('@vite/client') ||
+              event.message.includes('createWebSocketModuleRunnerTransport')))
+        ) {
+          event.preventDefault();
+        }
+      });
+    </script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>
