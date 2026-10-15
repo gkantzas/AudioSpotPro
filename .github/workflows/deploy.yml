@@ -2,7 +2,7 @@ name: Deploy Vite to GitHub Pages
 
 on:
   push:
-    branches: ['main'] # Άλλαξέ το σε 'master' αν το default branch σου λέγεται master
+    branches: ['main'] # Άλλαξέ το σε 'master' αν το default branch σου είναι master
 
 permissions:
   contents: read
@@ -29,7 +29,7 @@ jobs:
           node-version: 22
 
       - name: Install dependencies
-        run: npm install
+        run: npm install --legacy-peer-deps
 
       - name: Build project
         run: npm run build
