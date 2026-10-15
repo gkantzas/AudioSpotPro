@@ -1,6 +1,6 @@
 /**
- * Broadcast SFX Engine (GitHub Pages Compatible)
- * Loads real acoustic audio assets from public/sfx with procedural Web Audio fallback.
+ * Broadcast SFX Engine (GitHub Pages & Vite Compatible)
+ * Maps studio SFX types to physical audio filenames in public/sfx with procedural fallback.
  */
 
 export type SFXType =
@@ -60,11 +60,21 @@ export type SFXType =
   | 'cartoon_cowbell'
   | 'clown_horn';
 
-// Cache for loaded audio buffers to avoid redundant fetches
+// Αντιστοίχιση των SFXType με τα πραγματικά ονόματα αρχείων στο public/sfx
+const SFX_FILE_ALIASES: Partial<Record<SFXType, string[]>> = {
+  bell_chime: ['medium_bell_ringing', 'bell_chime'],
+  whoosh: ['whoosh_swoosh', 'whoosh'],
+  thunder_storm: ['thunder_crack', 'thunder_storm'],
+  car_screech: ['car_screech', 'tires_screech'],
+  sub_impact: ['sub_impact', 'bass_drop'],
+  doorbell: ['doorbell', 'ding_dong'],
+};
+
+// Cache αποκωδικοποιημένων AudioBuffer
 const sfxBufferCache = new Map<string, AudioBuffer>();
 
 /**
- * Resolves the correct base path on GitHub Pages or local Vite dev server
+ * Υπολογίζει σωστά το URL του asset είτε τρέχει σε localhost είτε στο GitHub Pages
  */
 function resolveSfxUrl(filename: string): string {
   const base = import.meta.env.BASE_URL || './';
@@ -74,30 +84,35 @@ function resolveSfxUrl(filename: string): string {
 }
 
 /**
- * Loads a real audio asset from public/sfx, trying .ogg, .mp3, or .wav
+ * Φορτώνει το πραγματικό audio asset από το public/sfx δοκιμάζοντας aliases και επεκτάσεις (.ogg, .mp3, .wav)
  */
 async function loadAudioAsset(ctx: BaseAudioContext, sfxType: SFXType): Promise<AudioBuffer> {
   const cached = sfxBufferCache.get(sfxType);
   if (cached) return cached;
 
+  const candidateNames = SFX_FILE_ALIASES[sfxType]
+    ? [...SFX_FILE_ALIASES[sfxType]!, sfxType]
+    : [sfxType];
+
   const extensions = ['ogg', 'mp3', 'wav'];
   let lastError: any = null;
 
-  for (const ext of extensions) {
-    const url = resolveSfxUrl(`${sfxType}.${ext}`);
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`SFX HTTP ${response.status} for ${url}`);
-      }
+  for (const name of candidateNames) {
+    for (const ext of extensions) {
+      const url = resolveSfxUrl(`${name}.${ext}`);
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`SFX HTTP ${response.status} for ${url}`);
+        }
 
-      const arrayBuffer = await response.arrayBuffer();
-      // Decode audio data using browser Web Audio API
-      const decodedBuffer = await (ctx as AudioContext).decodeAudioData(arrayBuffer);
-      sfxBufferCache.set(sfxType, decodedBuffer);
-      return decodedBuffer;
-    } catch (err) {
-      lastError = err;
+        const arrayBuffer = await response.arrayBuffer();
+        const decodedBuffer = await (ctx as AudioContext).decodeAudioData(arrayBuffer);
+        sfxBufferCache.set(sfxType, decodedBuffer);
+        return decodedBuffer;
+      } catch (err) {
+        lastError = err;
+      }
     }
   }
 
@@ -105,7 +120,7 @@ async function loadAudioAsset(ctx: BaseAudioContext, sfxType: SFXType): Promise<
 }
 
 /**
- * Renders an SFX AudioBuffer: tries real file from public/sfx first, falls back to procedural synth.
+ * Παράγει το AudioBuffer: δοκιμάζει το φυσικό αρχείο και, αν αποτύχει, ενεργοποιεί το procedural synth
  */
 export async function renderSFXBuffer(
   ctx: BaseAudioContext,
@@ -118,7 +133,6 @@ export async function renderSFXBuffer(
       return assetBuffer;
     }
 
-    // Apply volume scaling if customized
     const scaled = ctx.createBuffer(
       assetBuffer.numberOfChannels,
       assetBuffer.length,
@@ -139,14 +153,13 @@ export async function renderSFXBuffer(
 }
 
 /**
- * Procedural Audio Synthesis Fallback (when audio files are missing or offline)
+ * Procedural Audio Synthesis Fallback (Web Audio API)
  */
 function renderProceduralSFX(ctx: BaseAudioContext, sfxType: SFXType, volume = 1.0): AudioBuffer {
   const sampleRate = ctx.sampleRate;
 
   switch (sfxType) {
     case 'cash_register': {
-      // Crisp metallic chime & mechanical transient
       const dur = 0.55;
       const buf = ctx.createBuffer(2, Math.floor(sampleRate * dur), sampleRate);
       const left = buf.getChannelData(0);
@@ -171,7 +184,6 @@ function renderProceduralSFX(ctx: BaseAudioContext, sfxType: SFXType, volume = 1
     }
 
     case 'whoosh': {
-      // Dynamic filtered noise transition sweep
       const dur = 0.6;
       const buf = ctx.createBuffer(2, Math.floor(sampleRate * dur), sampleRate);
       const left = buf.getChannelData(0);
@@ -182,7 +194,6 @@ function renderProceduralSFX(ctx: BaseAudioContext, sfxType: SFXType, volume = 1
         const env = Math.sin(Math.PI * t);
         const noise = (Math.random() * 2 - 1) * env * 0.5 * volume;
 
-        // Stereo pan sweep left to right
         left[i] = noise * (1 - t);
         right[i] = noise * t;
       }
@@ -190,7 +201,6 @@ function renderProceduralSFX(ctx: BaseAudioContext, sfxType: SFXType, volume = 1
     }
 
     case 'sub_impact': {
-      // 808 deep sub-bass cinematic drop
       const dur = 0.8;
       const buf = ctx.createBuffer(2, Math.floor(sampleRate * dur), sampleRate);
       const left = buf.getChannelData(0);
@@ -211,7 +221,6 @@ function renderProceduralSFX(ctx: BaseAudioContext, sfxType: SFXType, volume = 1
     case 'radio_beep':
     case 'bell_chime':
     default: {
-      // Warm radio sine chime
       const dur = 0.45;
       const buf = ctx.createBuffer(2, Math.floor(sampleRate * dur), sampleRate);
       const left = buf.getChannelData(0);
