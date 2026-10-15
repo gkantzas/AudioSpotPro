@@ -1,5 +1,5 @@
 /**
- * Core Audio Production & Mixdown Engine
+ * Core Audio Production & Mixdown Engine (GitHub Pages Client-Side BYOK Edition)
  * Orchestrates multi-speaker voice synthesis, sound effects, procedural music bed, and broadcast mastering.
  */
 
@@ -7,6 +7,7 @@ import { renderSFXBuffer, SFXType } from './soundEffects';
 import { renderMusicBedBuffer, MusicBedStyle } from './musicBedGenerator';
 import { encodeWav, WavExportOptions } from './wavEncoder';
 import { convertWavBlobToMp3 } from './mp3Encoder';
+import { clientSynthesizeSpeech } from './geminiClientService';
 
 export interface VoiceTimbre {
   id: string; // 'Fenrir' | 'Puck' | 'Charon' | 'Kore' | 'Zephyr' | 'Aoede'
@@ -121,7 +122,6 @@ export const AVAILABLE_TIMBRES: VoiceTimbre[] = [
     geminiVoice: 'Fenrir',
     defaultActingStyle: 'Epic, deep cinematic trailer narrator, authoritative and dramatic',
   },
-
   {
     id: 'Thanasis',
     name: 'Θανάσης — Αυθεντικός & Λαϊκός',
@@ -343,92 +343,39 @@ export interface ScriptLine {
   type: 'dialogue' | 'sfx_only';
   speakerTag: string;
   originalText: string;
-  spokenText: string; // Pure spoken words ONLY (never titles, speaker names, or stage directions)
+  spokenText: string;
   cues: string[];
   sfxTriggers: SFXType[];
-  sfxVolume?: number; // Custom per-cue volume override e.g. 0.8
+  sfxVolume?: number;
   pauseAfterSeconds: number;
 }
 
 export interface ProductionSettings {
   targetDurationSeconds: number;
   musicBedStyle: MusicBedStyle;
-  musicVolume: number; // 0.0 to 1.0 (e.g. 0.35)
+  musicVolume: number;
   enableDucking: boolean;
-  duckingAmount: number; // 0.25 (-12dB)
-  sfxVolume: number; // 0.0 to 1.5 (default 1.0 = 100%)
+  duckingAmount: number;
+  sfxVolume: number;
   format: 'wav' | 'mp3';
-  sampleRate: number; // 22050, 24000, 44100, 48000, 96000
+  sampleRate: number;
   bitDepth: 16 | 24 | 32;
-  channels: 1 | 2; // Mono or Stereo
+  channels: 1 | 2;
 }
 
-/**
- * Infers gender ('male' | 'female') from a Greek role description or name
- */
 export function inferGenderFromText(text: string): 'male' | 'female' | null {
   const lower = text.toLowerCase();
   const femaleKeywords = [
-    'γυναίκ',
-    'γυναικ',
-    'female',
-    'woman',
-    'girl',
-    'mother',
-    'mom',
-    'lady',
-    'actress',
-    'αφηγήτρια',
-    'εκφωνήτρια',
-    'πελάτισσα',
-    'μαρία',
-    'ελένη',
-    'κατερίνα',
-    'σοφία',
-    'άννα',
-    'δήμητρα',
-    'ιωάννα',
-    'ευαγγελία',
-    'γεωργία',
-    'μητέρα',
-    'μαμά',
-    'φίλη',
-    'κοπέλα',
-    'κυρία',
-    'δασκάλα',
-    'γιατρίνα',
-    'πωλήτρια',
-    'σύζυγος (γυναίκα)',
+    'γυναίκ', 'γυναικ', 'female', 'woman', 'girl', 'mother', 'mom', 'lady', 'actress',
+    'αφηγήτρια', 'εκφωνήτρια', 'πελάτισσα', 'μαρία', 'ελένη', 'κατερίνα', 'σοφία',
+    'άννα', 'δήμητρα', 'ιωάννα', 'ευαγγελία', 'γεωργία', 'μητέρα', 'μαμά', 'φίλη',
+    'κοπέλα', 'κυρία', 'δασκάλα', 'γιατρίνα', 'πωλήτρια', 'σύζυγος (γυναίκα)',
   ];
   const maleKeywords = [
-    'άνδρ',
-    'άντρ',
-    'ανδρ',
-    'male',
-    'man',
-    'boy',
-    'father',
-    'dad',
-    'guy',
-    'gentleman',
-    'actor',
-    'αφηγητής',
-    'εκφωνητής',
-    'πελάτης',
-    'γιώργος',
-    'κώστας',
-    'δημήτρης',
-    'νίκος',
-    'γιάννης',
-    'παναγιώτης',
-    'βασίλης',
-    'χρήστος',
-    'πατέρας',
-    'μπαμπάς',
-    'φίλος',
-    'κύριος',
-    'πωλητής',
-    'οδηγός',
+    'άνδρ', 'άντρ', 'ανδρ', 'male', 'man', 'boy', 'father', 'dad', 'guy', 'gentleman',
+    'actor', 'αφηγητής', 'εκφωνητής', 'πελάτης', 'γιώργος', 'κώστας', 'δημήτρης',
+    'νίκος', 'γιάννης', 'παναγιώτης', 'βασίλης', 'χρήστος', 'πατέρας', 'μπαμπάς',
+    'φίλος', 'κύριος', 'πωλητής', 'οδηγός',
   ];
 
   for (const kw of femaleKeywords) {
@@ -440,20 +387,11 @@ export function inferGenderFromText(text: string): 'male' | 'female' | null {
   return null;
 }
 
-/**
- * Returns the default voice timbre ID for a given gender and speaker index
- */
 export function getDefaultTimbreForGender(gender: 'male' | 'female', index: number = 0): VoiceTimbre {
   const pool = AVAILABLE_TIMBRES.filter((t) => t.gender === gender);
   return pool[index % pool.length] || AVAILABLE_TIMBRES[0];
 }
 
-/**
- * Maps an SFX text description to our procedural SFXType (supports Greek and English)
- */
-/**
- * Parses an SFX tag string to extract both SFXType and any custom volume level (e.g. "@ 80%" or "@ 0.7")
- */
 export function parseSFXTag(sfxText: string): { type: SFXType; volume?: number } {
   let volume: number | undefined;
   const volMatch = sfxText.match(/@\s*(\d+(?:[.,]\d+)?)\s*(%)?/);
@@ -470,9 +408,6 @@ export function parseSFXTag(sfxText: string): { type: SFXType; volume?: number }
   return { type, volume };
 }
 
-/**
- * Maps an SFX text description to our studio SFXType (supports extensive Greek and English aliases)
- */
 export function mapTextToSFXType(sfxText: string): SFXType {
   const lower = sfxText.toLowerCase();
 
@@ -636,12 +571,6 @@ export function mapTextToSFXType(sfxText: string): SFXType {
   return 'bell_chime';
 }
 
-/**
- * Parses the script from the editor into a clean commercial production timeline.
- * Handles all speaker notations ([Φωνή 1], Φωνή 2:, [Μαρία]:, standalone speaker headers, conversational dashes),
- * strips out script headers, titles, timestamps, speaker labels, and stage notes
- * so that ONLY actual commercial dialogue is spoken by each voice actor at their exact turn.
- */
 export function parseScript(rawScript: string, speakerConfigs: SpeakerConfig[]): ScriptLine[] {
   const lines = rawScript.split('\n');
   const parsed: ScriptLine[] = [];
@@ -649,12 +578,10 @@ export function parseScript(rawScript: string, speakerConfigs: SpeakerConfig[]):
   let lineCounter = 0;
   let dashTurnIndex = 0;
 
-  // Helper to resolve speaker tag from any label (e.g. "Φωνή 2", "Μαρία", "Αφηγητής", "Γυναίκα")
   const resolveSpeakerTag = (rawLabel: string): string | null => {
     const clean = rawLabel.replace(/^\[|\]$/g, '').trim();
     if (!clean) return null;
 
-    // 1. Explicit "Φωνή X" or "Voice X" or "Speaker X"
     const voiceNumMatch = clean.match(/(?:Φωνή|Φωνη|Speaker|Voice|Voz|Voix|Stimme)\s*(\d+)/i);
     if (voiceNumMatch) {
       const num = voiceNumMatch[1];
@@ -671,7 +598,6 @@ export function parseScript(rawScript: string, speakerConfigs: SpeakerConfig[]):
       return isVoice ? `Voice ${num}` : `Φωνή ${num}`;
     }
 
-    // 2. Match by configured displayName (e.g. "Μαρία", "Αφηγητής", "Narrator", "Customer")
     const lowerClean = clean.toLowerCase();
     for (const spk of speakerConfigs) {
       const nameLower = spk.displayName.trim().toLowerCase();
@@ -680,7 +606,6 @@ export function parseScript(rawScript: string, speakerConfigs: SpeakerConfig[]):
       }
     }
 
-    // 3. Match by inferred gender if speakerConfigs has a speaker of that gender
     const inferredGender = inferGenderFromText(clean);
     if (inferredGender) {
       const genderMatch = speakerConfigs.find((s) => s.gender === inferredGender);
@@ -691,11 +616,9 @@ export function parseScript(rawScript: string, speakerConfigs: SpeakerConfig[]):
   };
 
   for (const rawLine of lines) {
-    // Strip markdown bold/italics and leading/trailing whitespace
     let cleanedLine = rawLine.replace(/\*\*/g, '').trim();
     if (!cleanedLine) continue;
 
-    // 1. Skip structural dividers and markdown headings
     if (
       cleanedLine.startsWith('===') ||
       cleanedLine.startsWith('---') ||
@@ -705,7 +628,6 @@ export function parseScript(rawScript: string, speakerConfigs: SpeakerConfig[]):
       continue;
     }
 
-    // 2. Skip script metadata headers (Τίτλος, Title, Σύνοψη, Synopsis, Concept, κλπ.)
     if (
       /^(?:τίτλος|title|σύνοψη|synopsis|concept|διάρκεια|duration|ύφος|style|μουσική υπόκρουση|music|σκηνή\s*\d*|scene\s*\d*|σημείωση|note|οδηγίες|instructions|προτεινόμενη)/i.test(
         cleanedLine
@@ -714,18 +636,15 @@ export function parseScript(rawScript: string, speakerConfigs: SpeakerConfig[]):
       continue;
     }
 
-    // 3. Strip leading timestamps like "(0:00 - 0:05)" or "00:00 - 00:05:"
     cleanedLine = cleanedLine
       .replace(/^\(?\d{1,2}:\d{2}\s*(?:-\s*\d{1,2}:\d{2})?\)?\s*[:-]?\s*/i, '')
       .trim();
     if (!cleanedLine) continue;
 
-    // 4. Ignore standalone [ΜΟΥΣΙΚΗ: ...] or [MUSIC: ...] lines
-    if (/^\[(?:ΜΟΥΣΙΚΗ|MUSIC):[^\]]*\]$/i.test(cleanedLine)) {
+    if (/^\[(?:ΜΟΥΣΙΚΗ\vert{}MUSIC):[^\]]*\]$/i.test(cleanedLine)) {
       continue;
     }
 
-    // 5. Check if the line is a standalone [SFX: ...] cue
     const standaloneSfxMatch = cleanedLine.match(/^\[SFX:\s*([^\]]+)\]$/i);
     if (standaloneSfxMatch) {
       lineCounter++;
@@ -744,35 +663,30 @@ export function parseScript(rawScript: string, speakerConfigs: SpeakerConfig[]):
       continue;
     }
 
-    // 6. Check if the line is a standalone speaker header (e.g. "[Φωνή 2 - Μαρία (Γυναίκα)]" or "[Voice 1 - Narrator (Male)]" or "Voice 2:")
-    const standaloneSpeakerHeader = cleanedLine.match(/^\[?((?:Φωνή|Voice|Speaker|Voz|Voix|Stimme)\s*\d+[^\]:]*)\]?\s*:?\s*$/i);
+    const standaloneSpeakerHeader = cleanedLine.match(/^\[?((?:Φωνή\vert{}Voice\vert{}Speaker\vert{}Voz\vert{}Voix\vert{}Stimme)\s*\d+[^\]:]*)\]?\s*:?\s*$/i);
     if (standaloneSpeakerHeader) {
       const resolved = resolveSpeakerTag(standaloneSpeakerHeader[1]);
       if (resolved) currentSpeaker = resolved;
       continue;
     }
 
-    // 7. Match speaker prefix in various formats:
-    // Format A: "[Voice 1 - Narrator (Male)]: Text..." or "[Φωνή 1 - Αφηγητής (Άνδρας)]: Κείμενο..."
     let spokenContent = cleanedLine;
     let speakerMatchedOnLine = false;
 
-    const bracketSpeakerMatch = cleanedLine.match(/^\[?((?:Φωνή|Voice|Speaker|Voz|Voix|Stimme)\s*(\d+)[^\]:]*)\]?\s*:\s*(.*)/i);
+    const bracketSpeakerMatch = cleanedLine.match(/^\[?((?:Φωνή\vert{}Voice\vert{}Speaker\vert{}Voz\vert{}Voix\vert{}Stimme)\s*(\d+)[^\]:]*)\]?\s*:\s*(.*)/i);
     if (bracketSpeakerMatch) {
       const resolved = resolveSpeakerTag(bracketSpeakerMatch[1]);
       if (resolved) currentSpeaker = resolved;
       spokenContent = bracketSpeakerMatch[3].trim();
       speakerMatchedOnLine = true;
     } else {
-      // Format B: Line starts with "[Voice X ...]" or "[Φωνή X ...]" without colon
-      const inlineSpeakerMatch = cleanedLine.match(/^\[((?:Φωνή|Voice|Speaker|Voz|Voix|Stimme)\s*(\d+)[^\]]*)\]\s*(.*)/i);
+      const inlineSpeakerMatch = cleanedLine.match(/^\[((?:Φωνή\vert{}Voice\vert{}Speaker\vert{}Voz\vert{}Voix\vert{}Stimme)\s*(\d+)[^\]]*)\]\s*(.*)/i);
       if (inlineSpeakerMatch) {
         const resolved = resolveSpeakerTag(inlineSpeakerMatch[1]);
         if (resolved) currentSpeaker = resolved;
         spokenContent = inlineSpeakerMatch[3].trim();
         speakerMatchedOnLine = true;
       } else {
-        // Format C: Line starts with role name prefix like "[Μαρία]: Κείμενο" or "Narrator: Text"
         const rolePrefixMatch = cleanedLine.match(/^\[?([Α-Ωα-ωΆ-Ώά-ώA-Za-z0-9\s()-]{2,32})\]?\s*:\s+(.+)/);
         if (rolePrefixMatch) {
           const candidateLabel = rolePrefixMatch[1].trim();
@@ -786,7 +700,6 @@ export function parseScript(rawScript: string, speakerConfigs: SpeakerConfig[]):
       }
     }
 
-    // Format D: Conversational dialogue dash ("- Text..." or "— Text...") when multiple speakers exist
     if (!speakerMatchedOnLine && /^[-–—]\s+/.test(spokenContent) && speakerConfigs.length > 1) {
       spokenContent = spokenContent.replace(/^[-–—]\s+/, '').trim();
       currentSpeaker = speakerConfigs[dashTurnIndex % speakerConfigs.length].speakerTag;
@@ -795,7 +708,6 @@ export function parseScript(rawScript: string, speakerConfigs: SpeakerConfig[]):
 
     if (!spokenContent) continue;
 
-    // 8. Extract inline SFX triggers: [SFX: ...]
     const sfxTriggers: SFXType[] = [];
     let inlineSfxVolume: number | undefined;
     const sfxRegex = /\[SFX:\s*([^\]]+)\]/gi;
@@ -808,9 +720,8 @@ export function parseScript(rawScript: string, speakerConfigs: SpeakerConfig[]):
       }
     }
 
-    // 9. Extract custom pause duration if present: e.g. [παύση 1.5s] or [pause 1s]
     let pauseAfterSeconds = 0.18;
-    const pauseMatch = spokenContent.match(/\[(?:παύση|pause)\s*(\d+(?:[.,]\d+)?)\s*s?\]/i);
+    const pauseMatch = spokenContent.match(/\[(?:παύση\vert{}pause)\s*(\d+(?:[.,]\d+)?)\s*s?\]/i);
     if (pauseMatch) {
       const pVal = parseFloat(pauseMatch[1].replace(',', '.'));
       if (!isNaN(pVal) && pVal > 0 && pVal <= 5) {
@@ -818,32 +729,21 @@ export function parseScript(rawScript: string, speakerConfigs: SpeakerConfig[]):
       }
     }
 
-    // 10. Extract acting cues: [γέλιο], [ψίθυρος], [excited], [urgent], <laugh>, etc.
     const cues: string[] = [];
     const cueRegex = /\[([^\]]+)\]|<(laugh|sigh|breath|gasp)>/gi;
     let cueMatch;
     while ((cueMatch = cueRegex.exec(spokenContent)) !== null) {
       const fullTag = cueMatch[0];
-      if (!/^\[(?:SFX|ΜΟΥΣΙΚΗ|MUSIC|Φωνή|Voice|Speaker|Voz|Voix|Stimme)/i.test(fullTag)) {
-        cues.push(fullTag);
-      }
-    }
-
-    // 11. Build clean spoken text for the commercial (pure spoken words only; acting cues are kept in `cues`)
-    const cleanSpokenForDisplay = spokenContent
-      .replace(/\[SFX:[^\]]*\]/gi, '')
-      .replace(/\[(?:ΜΟΥΣΙΚΗ|MUSIC):[^\]]*\]/gi, '')
-      .replace(/\[(?:παύση|pause)[^\]]*\]/gi, '... ')
-      // Strip all bracketed or XML stage directions so they are NEVER spoken as words
+      if (!/^\[(?:SFX\vert{}ΜΟΥΣΙΚΗ\vert{}MUSIC\vert{}Φωνή\vert{}Voice\vert{}Speaker\vert{}Voz\vert{}Voix\vert{}Stimme)/i.test(fullTag)) { cues.push(fullTag); } }      const cleanSpokenForDisplay = spokenContent .replace(/\[SFX:[^\]]*\]/gi, '')
+      .replace(/\[(?:ΜΟΥΣΙΚΗ\vert{}MUSIC):[^\]]*\]/gi, '')
+      .replace(/\[(?:παύση\vert{}pause)[^\]]*\]/gi, '... ')
       .replace(/\[[^\]]*\]/g, '')
       .replace(/<[^>]+>/g, '')
-      // Strip stage notes in parentheses like "(γελάει)" or "(laughing)"
-      .replace(/\((?:ήχος|sound|μουσική|music|φωνή|voice|speaker|παύση|pause|γελάει|γέλιο|laugh|ακούγεται|ψιθυριστά|whisper|έντονα|urgent)[^)]*\)/gi, '')
+      .replace(/\((?:ήχος\vert{}sound\vert{}μουσική\vert{}music\vert{}φωνή\vert{}voice\vert{}speaker\vert{}παύση\vert{}pause\vert{}γελάει\vert{}γέλιο\vert{}laugh\vert{}ακούγεται\vert{}ψιθυριστά\vert{}whisper\vert{}έντονα\vert{}urgent)[^)]*\)/gi, '')
       .replace(/\s+/g, ' ')
       .trim();
 
     if (cleanSpokenForDisplay.length > 0) {
-      // Prevent duplicate consecutive lines where two voices accidentally say the exact same text
       const prevDialogue = [...parsed].reverse().find((p) => p.type === 'dialogue');
       if (
         prevDialogue &&
@@ -883,11 +783,6 @@ export function parseScript(rawScript: string, speakerConfigs: SpeakerConfig[]):
   return parsed;
 }
 
-/**
- * Shifts pitch of an AudioBuffer while preserving natural speaking tempo
- * using Overlap-Add (OLA) time-stretching + linear resampling.
- * Prevents male voice pitch-shifts from sounding slowed down.
- */
 function shiftPitchPreserveTempo(
   ctx: BaseAudioContext,
   buffer: AudioBuffer,
@@ -899,12 +794,10 @@ function shiftPitchPreserveTempo(
   }
 
   const pitchRatio = Math.pow(2, pitchSemitones / 12);
-  // Target time-stretch factor before resampling so final duration = buffer.duration / tempoCompensation
   const stretchFactor = pitchRatio / tempoCompensation;
   const sampleRate = buffer.sampleRate;
   const numChannels = buffer.numberOfChannels;
 
-  // Step 1: OLA time-stretch by stretchFactor using 28ms Hanning grain window
   const windowSize = Math.floor(sampleRate * 0.028);
   const hopOut = Math.floor(windowSize / 2);
   const hopIn = Math.max(1, Math.round(hopOut / stretchFactor));
@@ -941,7 +834,6 @@ function shiftPitchPreserveTempo(
     stretchedChannels.push(out);
   }
 
-  // Step 2: Resample by pitchRatio to shift pitch while landing on exact natural tempo
   const finalLength = Math.max(1, Math.round(stretchedLength / pitchRatio));
   const outBuffer = ctx.createBuffer(numChannels, finalLength, sampleRate);
 
@@ -965,9 +857,8 @@ function shiftPitchPreserveTempo(
 }
 
 /**
- * Synthesizes a single spoken line into an AudioBuffer.
- * Uses server speech synthesis with strict gender voicing, authentic human Greek inflection,
- * and distinct voice persona characteristics so each speaker sounds unique.
+ * Pure Client-Side Speech Synthesis for GitHub Pages (BYOK).
+ * Calls Google Gemini TTS directly from browser memory without Express server.
  */
 export async function synthesizeLineAudio(
   audioCtx: BaseAudioContext,
@@ -975,41 +866,26 @@ export async function synthesizeLineAudio(
   speakerConfig: SpeakerConfig,
   productionLanguage: string = 'el'
 ): Promise<AudioBuffer> {
-  // Find timbre and enforce gender consistency
   let timbre = AVAILABLE_TIMBRES.find((t) => t.id === speakerConfig.timbreId);
   if (!timbre || timbre.gender !== speakerConfig.gender) {
     timbre = getDefaultTimbreForGender(speakerConfig.gender, 0);
   }
 
-  // Retrieve optional user API key from browser storage
   const userApiKey =
     typeof window !== 'undefined'
       ? localStorage.getItem('user_gemini_api_key') || ''
       : '';
 
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (userApiKey) {
-    headers['x-gemini-api-key'] = userApiKey;
-  }
-
-  try {
-    const res = await fetch('/api/synthesize-speech', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
+  if (userApiKey && line.spokenText.trim()) {
+    try {
+      const data = await clientSynthesizeSpeech({
+        apiKey: userApiKey,
         text: line.spokenText,
-        cues: line.cues,
         voiceName: timbre.geminiVoice,
-        gender: speakerConfig.gender,
-        styleInstruction: speakerConfig.actingStyle || timbre.defaultActingStyle,
-        productionLanguage,
-        customApiKey: userApiKey,
-      }),
-    });
+        actingStyle: speakerConfig.actingStyle || timbre.defaultActingStyle,
+      });
 
-    if (res.ok) {
-      const data = await res.json();
-      if (data.audioBase64) {
+      if (data && data.audioBase64) {
         const binaryStr = atob(data.audioBase64);
         const bytes = new Uint8Array(binaryStr.length);
         for (let i = 0; i < binaryStr.length; i++) {
@@ -1019,37 +895,20 @@ export async function synthesizeLineAudio(
         const decoded = await (audioCtx as AudioContext).decodeAudioData(bufferCopy);
         let trimmed = trimLeadingTrailingSilence(audioCtx, decoded);
 
-        // Determine per-timbre subtle offset so multiple speakers of the same gender sound distinct
-        const timbreIndex = Math.max(0, AVAILABLE_TIMBRES.findIndex((t) => t.id === timbre!.id));
-        const personaOffset = ((timbreIndex % 5) - 2) * 0.35; // -0.7 to +0.7 semitones variation per persona
-
-        if (data.isFallbackVoice) {
-          // When using Google Human Greek Speech fallback (which has a female base voice),
-          // shift male voices to a warm baritone while preserving 100% natural speaking speed!
-          const genderBaseShift = speakerConfig.gender === 'male' ? -2.9 : 0.3;
-          const totalPitch = genderBaseShift + personaOffset + (speakerConfig.pitch || 0);
-          const tempoComp = speakerConfig.gender === 'male' ? 1.06 : 1.04;
-          trimmed = shiftPitchPreserveTempo(audioCtx, trimmed, totalPitch, tempoComp);
-        } else if (Math.abs(speakerConfig.pitch || 0) > 0.1) {
-          // Native Gemini 3.8 TTS already has authentic male/female vocal cords; only apply user pitch slider
+        if (Math.abs(speakerConfig.pitch || 0) > 0.1) {
           trimmed = shiftPitchPreserveTempo(audioCtx, trimmed, speakerConfig.pitch || 0, 1.0);
         }
 
         return trimmed;
       }
+    } catch (err) {
+      console.warn('Direct Gemini TTS call failed, using fallback:', err);
     }
-  } catch (err) {
-    console.warn('Speech synthesis network notice:', err);
   }
 
-  // Emergency offline silence/formant pad (never triggers overlapping window.speechSynthesis during render)
   return synthesizeBrowserWebSpeechAudio(audioCtx, line.spokenText, speakerConfig);
 }
 
-/**
- * Trims excessive leading/trailing dead silence from TTS audio buffers
- * so that commercial dialogue pacing is tight and broadcast-ready.
- */
 function trimLeadingTrailingSilence(ctx: BaseAudioContext, buffer: AudioBuffer): AudioBuffer {
   const data = buffer.getChannelData(0);
   const threshold = 0.008;
@@ -1063,7 +922,6 @@ function trimLeadingTrailingSilence(ctx: BaseAudioContext, buffer: AudioBuffer):
     endSample--;
   }
 
-  // Keep a small 35ms natural pad around the speech
   const padSamples = Math.floor(buffer.sampleRate * 0.035);
   startSample = Math.max(0, startSample - padSamples);
   endSample = Math.min(data.length - 1, endSample + padSamples);
@@ -1082,9 +940,6 @@ function trimLeadingTrailingSilence(ctx: BaseAudioContext, buffer: AudioBuffer):
   return out;
 }
 
-/**
- * Emergency Offline Audio Buffer Fallback
- */
 async function synthesizeBrowserWebSpeechAudio(
   audioCtx: BaseAudioContext,
   text: string,
@@ -1122,11 +977,6 @@ export interface TimelineTrackSegment {
   speed?: number;
 }
 
-/**
- * Full Spot Production Mixdown:
- * Produces the final broadcast radio commercial combining expressive voice performances
- * in sequential conversational order, timed sound effects, and auto-ducked background music bed.
- */
 export async function renderFullSpotMixdown(
   parsedLines: ScriptLine[],
   speakerConfigs: SpeakerConfig[],
@@ -1162,7 +1012,6 @@ export async function renderFullSpotMixdown(
   const timelineSegments: TimelineTrackSegment[] = [];
   const voiceActiveRanges: { start: number; end: number }[] = [];
 
-  // Start after a 0.65s Music Intro so the listener feels the commercial vibe immediately
   let currentTime = settings.musicBedStyle !== 'none' ? 0.65 : 0.25;
 
   const dialogueItems = parsedLines.filter((l) => l.type === 'dialogue');
@@ -1171,7 +1020,6 @@ export async function renderFullSpotMixdown(
   for (let i = 0; i < parsedLines.length; i++) {
     const item = parsedLines[i];
 
-    // Case A: Standalone Sound Effect line [SFX: ...]
     if (item.type === 'sfx_only') {
       for (const sfxType of item.sfxTriggers) {
         const sfxVol = (settings.sfxVolume ?? 1.0) * (item.sfxVolume ?? 1.0);
@@ -1195,7 +1043,7 @@ export async function renderFullSpotMixdown(
           speakerTag: 'SFX',
           displayName: `SFX: ${sfxType}`,
           gender: 'male',
-          label: item.originalText.replace(/^\[SFX:\s*|\s*\]$/gi, ''),
+          label: item.originalText.replace(/^\[SFX:\s*\vert{}\s*\]$/gi, ''),
           startTime: sfxStart,
           endTime: sfxStart + sfxBuf.duration,
           originalStartTime: sfxStart,
@@ -1206,13 +1054,11 @@ export async function renderFullSpotMixdown(
           speed: 1.0,
         });
 
-        // Advance timeline slightly so the SFX is heard clearly before the next line starts
         currentTime += sfxAdvance;
       }
       continue;
     }
 
-    // Case B: Spoken Commercial Dialogue Line (each speaker enters at their exact sequential turn)
     const speaker =
       speakerConfigs.find((s) => s.speakerTag === item.speakerTag) ||
       speakerConfigs[0] || {
@@ -1271,7 +1117,6 @@ export async function renderFullSpotMixdown(
       end: lineEndTime,
     });
 
-    // Trigger any inline SFX attached to this line (e.g. at the end of the punchline)
     for (const sfxType of item.sfxTriggers) {
       const inlineVol = (settings.sfxVolume ?? 1.0) * (item.sfxVolume ?? 1.0);
       const sfxBuf = await renderSFXBuffer(tempCtx, sfxType, inlineVol);
@@ -1303,7 +1148,6 @@ export async function renderFullSpotMixdown(
       });
     }
 
-    // Natural conversational turn handoff between different speakers vs same speaker
     const nextDialogue = parsedLines.slice(i + 1).find((l) => l.type === 'dialogue');
     const isSpeakerSwitch = nextDialogue && nextDialogue.speakerTag !== item.speakerTag;
     const turnGap = item.pauseAfterSeconds || (isSpeakerSwitch ? 0.12 : 0.2);
@@ -1311,7 +1155,6 @@ export async function renderFullSpotMixdown(
     currentTime = lineEndTime + turnGap;
   }
 
-  // Add a 1.3s Music Outro swell after the final spoken word for a real radio commercial finish
   const outroTail = settings.musicBedStyle !== 'none' ? 1.3 : 0.4;
   const totalDuration = Math.max(2.0, currentTime + outroTail);
 
@@ -1333,7 +1176,6 @@ export async function renderFullSpotMixdown(
     settings.sampleRate
   );
 
-  // Broadcast Master Bus (Warmth + Limiter)
   const masterGain = offlineCtx.createGain();
   masterGain.gain.value = 0.96;
 
@@ -1347,7 +1189,6 @@ export async function renderFullSpotMixdown(
   masterGain.connect(limiter);
   limiter.connect(offlineCtx.destination);
 
-  // Schedule Voice and SFX tracks at their exact timeline cue points
   for (const ev of events) {
     const src = offlineCtx.createBufferSource();
     src.buffer = ev.buffer;
@@ -1369,7 +1210,6 @@ export async function renderFullSpotMixdown(
     src.start(ev.startTime);
   }
 
-  // Schedule Music Bed with Broadcast Intro, Auto-Ducking under Voice, and Outro Swell
   if (musicBuffer && settings.musicBedStyle !== 'none') {
     const musicSource = offlineCtx.createBufferSource();
     musicSource.buffer = musicBuffer;
@@ -1378,7 +1218,6 @@ export async function renderFullSpotMixdown(
     const fullMusicVol = settings.musicVolume;
     const duckedMusicVol = fullMusicVol * settings.duckingAmount;
 
-    // Fade in intro
     musicGain.gain.setValueAtTime(0.001, 0);
     musicGain.gain.linearRampToValueAtTime(fullMusicVol, 0.3);
 
@@ -1386,16 +1225,13 @@ export async function renderFullSpotMixdown(
       const firstVoiceStart = voiceActiveRanges[0].start;
       const lastVoiceEnd = voiceActiveRanges[voiceActiveRanges.length - 1].end;
 
-      // Hold full intro volume until just before first voice
       musicGain.gain.setValueAtTime(fullMusicVol, Math.max(0.3, firstVoiceStart - 0.15));
       musicGain.gain.linearRampToValueAtTime(duckedMusicVol, firstVoiceStart + 0.08);
 
-      // Swell back up after the final spoken word for the radio outro tag
       musicGain.gain.setValueAtTime(duckedMusicVol, lastVoiceEnd);
       musicGain.gain.linearRampToValueAtTime(fullMusicVol, Math.min(totalDuration - 0.4, lastVoiceEnd + 0.35));
     }
 
-    // Smooth fade out at the very end of the commercial
     const fadeOutStart = Math.max(0.5, totalDuration - 0.9);
     musicGain.gain.setValueAtTime(fullMusicVol, fadeOutStart);
     musicGain.gain.linearRampToValueAtTime(0.0001, totalDuration);
@@ -1418,10 +1254,6 @@ export async function renderFullSpotMixdown(
   return { masterBuffer: renderedBuffer, totalDuration, timelineSegments, musicBuffer };
 }
 
-/**
- * Ultra-fast timeline remix (~50ms) using in-memory cached voice & SFX audio buffers.
- * Called immediately after user drag-and-drops voice cues on the timeline.
- */
 export async function remixWithUpdatedTimeline(
   segments: TimelineTrackSegment[],
   musicBuffer: AudioBuffer | null,
@@ -1431,7 +1263,6 @@ export async function remixWithUpdatedTimeline(
   totalDuration: number;
   timelineSegments: TimelineTrackSegment[];
 }> {
-  // 1. Calculate new total duration based on furthest segment end time + outro tail
   const maxSegmentEnd = segments.reduce((max, s) => Math.max(max, s.endTime), 0);
   const outroTail = settings.musicBedStyle !== 'none' ? 1.3 : 0.4;
   const totalDuration = Math.max(2.0, maxSegmentEnd + outroTail);
@@ -1442,7 +1273,6 @@ export async function remixWithUpdatedTimeline(
     settings.sampleRate
   );
 
-  // Broadcast Master Bus (Warmth + Limiter)
   const masterGain = offlineCtx.createGain();
   masterGain.gain.value = 0.96;
 
@@ -1456,7 +1286,6 @@ export async function remixWithUpdatedTimeline(
   masterGain.connect(limiter);
   limiter.connect(offlineCtx.destination);
 
-  // Schedule Voice and SFX tracks at their updated startTime points
   const voiceActiveRanges: { start: number; end: number }[] = [];
 
   for (const seg of segments) {
@@ -1489,10 +1318,8 @@ export async function remixWithUpdatedTimeline(
     }
   }
 
-  // Sort ranges for clean music ducking
   voiceActiveRanges.sort((a, b) => a.start - b.start);
 
-  // Schedule Music Bed with Broadcast Intro, Auto-Ducking under updated voice positions, and Outro Swell
   if (musicBuffer && settings.musicBedStyle !== 'none') {
     const musicSource = offlineCtx.createBufferSource();
     musicSource.buffer = musicBuffer;
@@ -1501,7 +1328,6 @@ export async function remixWithUpdatedTimeline(
     const fullMusicVol = settings.musicVolume;
     const duckedMusicVol = fullMusicVol * settings.duckingAmount;
 
-    // Fade in intro
     musicGain.gain.setValueAtTime(0.001, 0);
     musicGain.gain.linearRampToValueAtTime(fullMusicVol, 0.3);
 
@@ -1509,11 +1335,9 @@ export async function remixWithUpdatedTimeline(
       const firstVoiceStart = voiceActiveRanges[0].start;
       const lastVoiceEnd = voiceActiveRanges.reduce((max, r) => Math.max(max, r.end), 0);
 
-      // Hold full intro volume until just before first voice
       musicGain.gain.setValueAtTime(fullMusicVol, Math.max(0.3, firstVoiceStart - 0.15));
       musicGain.gain.linearRampToValueAtTime(duckedMusicVol, Math.max(0.35, firstVoiceStart + 0.08));
 
-      // Swell back up after the final spoken word for the radio outro tag
       musicGain.gain.setValueAtTime(duckedMusicVol, lastVoiceEnd);
       musicGain.gain.linearRampToValueAtTime(
         fullMusicVol,
@@ -1521,7 +1345,6 @@ export async function remixWithUpdatedTimeline(
       );
     }
 
-    // Smooth fade out at the very end of the commercial
     const fadeOutStart = Math.max(0.5, totalDuration - 0.9);
     musicGain.gain.setValueAtTime(fullMusicVol, fadeOutStart);
     musicGain.gain.linearRampToValueAtTime(0.0001, totalDuration);
@@ -1539,9 +1362,6 @@ export async function remixWithUpdatedTimeline(
   };
 }
 
-/**
- * Exports final audio buffer into a downloadable Blob (WAV or MP3 with chosen specs)
- */
 export async function exportAudioFile(
   masterBuffer: AudioBuffer,
   settings: ProductionSettings
@@ -1549,9 +1369,6 @@ export async function exportAudioFile(
   return exportAudioInFormat(masterBuffer, settings, settings.format);
 }
 
-/**
- * Exports final audio buffer in a specified format ('wav' or 'mp3')
- */
 export async function exportAudioInFormat(
   masterBuffer: AudioBuffer,
   settings: ProductionSettings,
@@ -1571,7 +1388,6 @@ export async function exportAudioInFormat(
   const filename = `spot-${durationStr}s-${sampleRateKhz}kHz-${settings.bitDepth}bit-${chStr}.${ext}`;
 
   if (format === 'mp3') {
-    // Perform genuine MP3 conversion
     const mp3Blob = await convertWavBlobToMp3(wavBlob, masterBuffer, 256);
     return {
       blob: mp3Blob,
@@ -1586,3 +1402,4 @@ export async function exportAudioInFormat(
     mimeType: 'audio/wav',
   };
 }
+
